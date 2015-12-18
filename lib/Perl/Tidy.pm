@@ -74,6 +74,7 @@ use vars qw{
 @EXPORT = qw( &perltidy );
 
 use Cwd;
+use Encode ();
 use IO::File;
 use File::Basename;
 use File::Copy;
@@ -813,15 +814,12 @@ EOM
 
             $buf = $prefilter->($buf) if $prefilter;
 
-			if ( $rOpts_character_encoding && $rOpts_character_encoding eq 'utf8' && !utf8::is_utf8($buf) ) {
-				require Encode;
-
-				eval {
-					$buf = Encode::decode('UTF-8', $buf, Encode::FB_CROAK | Encode::LEAVE_SRC);
-				};
-
-				Die "unable to decode source\n" if $@;
-			}
+            if ( $rOpts_character_encoding && $rOpts_character_encoding eq 'utf8' && !utf8::is_utf8($buf) ) {
+                eval {
+                    $buf = Encode::decode('UTF-8', $buf, Encode::FB_CROAK | Encode::LEAVE_SRC);
+                };
+                Die "unable to decode source\n" if $@;
+            }
 
             $source_object = Perl::Tidy::LineSource->new( \$buf, $rOpts,
                 $rpending_logfile_message );
@@ -3940,7 +3938,10 @@ sub new {
         $output_file_open = 1;
         if ($binmode) {
             if ( ref($fh) eq 'IO::File' ) {
-                binmode $fh;
+                if ( $rOpts->{'character-encoding'} && $rOpts->{'character-encoding'} eq 'utf8' ) {
+                    binmode $fh, ":encoding(UTF-8)";
+                }
+                else { binmode $fh }
             }
             if ( $output_file eq '-' ) { binmode STDOUT }
         }
