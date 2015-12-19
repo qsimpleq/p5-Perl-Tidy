@@ -6297,7 +6297,8 @@ BEGIN {
     # We can remove semicolons after blocks preceded by these keywords
     @_ =
       qw(BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue if elsif else
-      unless while until for foreach given when default);
+      unless while until for foreach given when default
+      try catch finally);
     @is_block_without_semicolon{@_} = (1) x scalar(@_);
 
     # We will allow semicolons to be added within these block types
@@ -7699,7 +7700,8 @@ EOM
     # default keywords for which space is introduced before an opening paren
     # (at present, including them messes up vertical alignment)
     @_ = qw(my local our and or err eq ne if else elsif until
-      unless while for foreach return switch case given when);
+      unless while for foreach return switch case given when
+      try catch finally);
     @space_after_keyword{@_} = (1) x scalar(@_);
 
     # first remove any or all of these if desired
@@ -7806,7 +7808,7 @@ EOM
     push @_, ',';
 
     # allow cuddled continue if cuddled else is specified
-    if ( $rOpts->{'cuddled-else'} ) { push @_, 'continue'; }
+    if ( $rOpts->{'cuddled-else'} ) { push @_, qw'continue catch finally'; }
 
     @is_other_brace_follower{@_} = (1) x scalar(@_);
 
@@ -11700,7 +11702,7 @@ sub accumulate_block_text {
         # curly.  Note: 'else' does not, but must be included to allow trailing
         # if/elsif text to be appended.
         # patch for SWITCH/CASE: added 'case' and 'when'
-        @_ = qw(if elsif else unless while until for foreach case when);
+        @_ = qw(if elsif else unless while until for foreach case when catch);
         @is_if_elsif_else_unless_while_until_for_foreach{@_} =
           (1) x scalar(@_);
     }
@@ -24115,8 +24117,9 @@ sub prepare_for_a_new_file {
     # in the form:
     # keyword ( .... ) { BLOCK }
     # patch for SWITCH/CASE: added 'switch' 'case' 'given' 'when'
+    #   TryCatch catch($e) : added 'catch'
     my %is_blocktype_with_paren;
-    @_ = qw(if elsif unless while until for foreach switch case given when);
+    @_ = qw(if elsif unless while until for foreach switch case given when catch);
     @is_blocktype_with_paren{@_} = (1) x scalar(@_);
 
     # ------------------------------------------------------------
@@ -24933,7 +24936,8 @@ sub prepare_for_a_new_file {
     # patched for SWITCH/CASE/
     my %is_zero_continuation_block_type;
     @_ = qw( } { BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue ;
-      if elsif else unless while until for foreach switch case given when);
+      if elsif else unless while until for foreach switch case given when
+      try catch finally);
     @is_zero_continuation_block_type{@_} = (1) x scalar(@_);
 
     my %is_not_zero_continuation_block_type;
@@ -29852,7 +29856,8 @@ BEGIN {
     @_ =
       qw( BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue if elsif else
       unless do while until eval for foreach map grep sort
-      switch case given when);
+      switch case given when
+      try catch finally);
     @is_code_block_token{@_} = (1) x scalar(@_);
 
     # I'll build the list of keywords incrementally
