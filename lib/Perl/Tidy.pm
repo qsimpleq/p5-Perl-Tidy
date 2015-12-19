@@ -74,6 +74,7 @@ use vars qw{
 @EXPORT = qw( &perltidy );
 
 use Cwd;
+use Encode ();
 use IO::File;
 use File::Basename;
 use File::Copy;
@@ -173,12 +174,6 @@ EOM
     $fh = $New->( $filename, $mode )
       or Warn("Couldn't open file:$filename in mode:$mode : $!\n");
 
-    # The first call here will be to read the config file, which is before
-    # the --encoding has been set, so the config file cannot be read as utf8
-    $fh->binmode(':encoding(utf8)')
-      if ( $rOpts_character_encoding
-        && $rOpts_character_encoding eq 'utf8'
-        && $fh->can('binmode') );
     return $fh, ( $ref or $filename );
 }
 
@@ -811,12 +806,20 @@ EOM
         # Prefilters and postfilters: The prefilter is a code reference
         # that will be applied to the source before tidying, and the
         # postfilter is a code reference to the result before outputting.
-        if ($prefilter) {
+        if ( $prefilter || ( $rOpts_character_encoding && $rOpts_character_encoding eq 'utf8' ) ) {
             my $buf = '';
             while ( my $line = $source_object->get_line() ) {
                 $buf .= $line;
             }
-            $buf = $prefilter->($buf);
+
+            $buf = $prefilter->($buf) if $prefilter;
+
+            if ( $rOpts_character_encoding && $rOpts_character_encoding eq 'utf8' && !utf8::is_utf8($buf) ) {
+                eval {
+                    $buf = Encode::decode('UTF-8', $buf, Encode::FB_CROAK | Encode::LEAVE_SRC);
+                };
+                Die "unable to decode source\n" if $@;
+            }
 
             $source_object = Perl::Tidy::LineSource->new( \$buf, $rOpts,
                 $rpending_logfile_message );
@@ -1673,6 +1676,7 @@ sub generate_options {
     $add_option->( 'break-after-all-operators',               'baao',  '!' );
     $add_option->( 'break-before-all-operators',              'bbao',  '!' );
     $add_option->( 'keep-interior-semicolons',                'kis',   '!' );
+    $add_option->( 'keep-vertical-alignment',                 'kva',   '!' );
 
     ########################################
     $category = 6;    # Controlling list formatting
@@ -3935,7 +3939,10 @@ sub new {
         $output_file_open = 1;
         if ($binmode) {
             if ( ref($fh) eq 'IO::File' ) {
-                binmode $fh;
+                if ( $rOpts->{'character-encoding'} && $rOpts->{'character-encoding'} eq 'utf8' ) {
+                    binmode $fh, ":encoding(UTF-8)";
+                }
+                else { binmode $fh }
             }
             if ( $output_file eq '-' ) { binmode STDOUT }
         }
@@ -6290,7 +6297,8 @@ BEGIN {
     # We can remove semicolons after blocks preceded by these keywords
     @_ =
       qw(BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue if elsif else
-      unless while until for foreach given when default);
+      unless while until for foreach given when default
+      try catch finally);
     @is_block_without_semicolon{@_} = (1) x scalar(@_);
 
     # We will allow semicolons to be added within these block types
@@ -7692,7 +7700,8 @@ EOM
     # default keywords for which space is introduced before an opening paren
     # (at present, including them messes up vertical alignment)
     @_ = qw(my local our and or err eq ne if else elsif until
-      unless while for foreach return switch case given when);
+      unless while for foreach return switch case given when
+      try catch finally);
     @space_after_keyword{@_} = (1) x scalar(@_);
 
     # first remove any or all of these if desired
@@ -7799,7 +7808,7 @@ EOM
     push @_, ',';
 
     # allow cuddled continue if cuddled else is specified
-    if ( $rOpts->{'cuddled-else'} ) { push @_, 'continue'; }
+    if ( $rOpts->{'cuddled-else'} ) { push @_, qw'continue catch finally'; }
 
     @is_other_brace_follower{@_} = (1) x scalar(@_);
 
@@ -11693,7 +11702,7 @@ sub accumulate_block_text {
         # curly.  Note: 'else' does not, but must be included to allow trailing
         # if/elsif text to be appended.
         # patch for SWITCH/CASE: added 'case' and 'when'
-        @_ = qw(if elsif else unless while until for foreach case when);
+        @_ = qw(if elsif else unless while until for foreach case when catch);
         @is_if_elsif_else_unless_while_until_for_foreach{@_} =
           (1) x scalar(@_);
     }
@@ -13644,20 +13653,22 @@ sub get_seqno {
 
     BEGIN {
 
-        # Removed =~ from list to improve chances of alignment
-        @_ = qw#
-          = **= += *= &= <<= &&= -= /= |= >>= ||= //= .= %= ^= x=
-          { ? : => && || // ~~ !~~
-          #;
-        @is_vertical_alignment_type{@_} = (1) x scalar(@_);
+        unless ($rOpts->{'keep-vertical-alignment'}) {
+            # Removed =~ from list to improve chances of alignment
+            @_ = qw#
+              = **= += *= &= <<= &&= -= /= |= >>= ||= //= .= %= ^= x=
+              { ? : => && || // ~~ !~~
+              #;
+            @is_vertical_alignment_type{@_} = (1) x scalar(@_);
 
-        # only align these at end of line
-        @_ = qw(&& ||);
-        @is_terminal_alignment_type{@_} = (1) x scalar(@_);
+            # only align these at end of line
+            @_ = qw(&& ||);
+            @is_terminal_alignment_type{@_} = (1) x scalar(@_);
 
-        # eq and ne were removed from this list to improve alignment chances
-        @_ = qw(if unless and or err for foreach while until);
-        @is_vertical_alignment_keyword{@_} = (1) x scalar(@_);
+            # eq and ne were removed from this list to improve alignment chances
+            @_ = qw(if unless and or err for foreach while until);
+            @is_vertical_alignment_keyword{@_} = (1) x scalar(@_);
+        }
     }
 
     sub set_vertical_alignment_markers {
@@ -24106,8 +24117,9 @@ sub prepare_for_a_new_file {
     # in the form:
     # keyword ( .... ) { BLOCK }
     # patch for SWITCH/CASE: added 'switch' 'case' 'given' 'when'
+    #   TryCatch catch($e) : added 'catch'
     my %is_blocktype_with_paren;
-    @_ = qw(if elsif unless while until for foreach switch case given when);
+    @_ = qw(if elsif unless while until for foreach switch case given when catch);
     @is_blocktype_with_paren{@_} = (1) x scalar(@_);
 
     # ------------------------------------------------------------
@@ -24924,7 +24936,8 @@ sub prepare_for_a_new_file {
     # patched for SWITCH/CASE/
     my %is_zero_continuation_block_type;
     @_ = qw( } { BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue ;
-      if elsif else unless while until for foreach switch case given when);
+      if elsif else unless while until for foreach switch case given when
+      try catch finally);
     @is_zero_continuation_block_type{@_} = (1) x scalar(@_);
 
     my %is_not_zero_continuation_block_type;
@@ -29843,7 +29856,8 @@ BEGIN {
     @_ =
       qw( BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue if elsif else
       unless do while until eval for foreach map grep sort
-      switch case given when);
+      switch case given when
+      try catch finally);
     @is_code_block_token{@_} = (1) x scalar(@_);
 
     # I'll build the list of keywords incrementally
