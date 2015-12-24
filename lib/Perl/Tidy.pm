@@ -7657,7 +7657,7 @@ EOM
 
     # implement outdenting preferences for keywords
     %outdent_keyword = ();
-    unless ( @_ = split_words( $rOpts->{'outdent-keyword-okl'} ) ) {
+    unless ( @_ = split_words( $rOpts->{'outdent-keyword-list'} ) ) {
         @_ = qw(next last redo goto return);    # defaults
     }
 
