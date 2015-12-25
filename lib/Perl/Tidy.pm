@@ -1577,6 +1577,7 @@ sub generate_options {
     $add_option->( 'continuation-indentation',           'ci',   '=i' );
     $add_option->( 'line-up-parentheses',                'lp',   '!' );
     $add_option->( 'outdent-keyword-list',               'okwl', '=s' );
+    $add_option->( 'outdent-keyword-size',               'okws', '=i' );
     $add_option->( 'outdent-keywords',                   'okw',  '!' );
     $add_option->( 'outdent-labels',                     'ola',  '!' );
     $add_option->( 'outdent-long-quotes',                'olq',  '!' );
@@ -1870,6 +1871,7 @@ sub generate_options {
       nowarning-output
       character-encoding=none
       outdent-labels
+      outdent-keyword-size=2
       outdent-long-quotes
       outdent-long-comments
       paren-tightness=1
@@ -3493,6 +3495,7 @@ Outdenting
  -ola    outdent statement labels
  -okw    outdent control keywords (redo, next, last, goto, return)
  -okwl=s specify alternative keywords for -okw command
+ -okws=i specify alternative keywords outdent size for -okw command
 
 Other controls
  -mft=n  maximum fields per table; default n=40
@@ -13328,8 +13331,18 @@ sub lookup_opening_indentation {
         {
             my $space_count = leading_spaces_to_go($ibeg);
             if ( $space_count > 0 ) {
-                $space_count -= $rOpts_continuation_indentation;
+                if (
+                       $rOpts->{'outdent-keywords'}
+                    && $types_to_go[$ibeg] eq 'k'
+                    && $outdent_keyword{ $tokens_to_go[$ibeg] }
+                    && $rOpts->{'outdent-keyword-size'}
+                    )
+                {
+                    $space_count -= $rOpts->{'outdent-keyword-size'};
+                }
+                else { $space_count -= $rOpts_continuation_indentation; }
                 $is_outdented_line = 1;
+
                 if ( $space_count < 0 ) { $space_count = 0 }
 
                 # do not promote a spaced static block comment to non-spaced;
