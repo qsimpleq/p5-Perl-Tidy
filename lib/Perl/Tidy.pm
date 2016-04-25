@@ -3,7 +3,7 @@
 #
 #    perltidy - a perl script indenter and formatter
 #
-#    Copyright (c) 2000-2015 by Steve Hancock
+#    Copyright (c) 2000-2016 by Steve Hancock
 #    Distributed under the GPL license agreement; see file COPYING
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -53,9 +53,11 @@
 ############################################################
 
 package Perl::Tidy;
-use 5.004;    # need IO::File from 5.004 or later
-BEGIN { $^W = 1; }    # turn on warnings
 
+# Actually should use a version later than about 5.8.5 to use
+# wide characters.
+use 5.004;    # need IO::File from 5.004 or later
+use warnings;
 use strict;
 use Exporter;
 use Carp;
@@ -81,7 +83,7 @@ use File::Copy;
 use File::Temp qw(tempfile);
 
 BEGIN {
-    ( $VERSION = q($Id: Tidy.pm,v 1.74 2015/08/15 13:56:49 perltidy Exp $) ) =~ s/^.*\s+(\d+)\/(\d+)\/(\d+).*$/$1$2$3/; # all one line for MakeMaker
+    ( $VERSION = q($Id: Tidy.pm,v 1.74 2016/03/02 13:56:49 perltidy Exp $) ) =~ s/^.*\s+(\d+)\/(\d+)\/(\d+).*$/$1$2$3/; # all one line for MakeMaker
 }
 
 sub streamhandle {
