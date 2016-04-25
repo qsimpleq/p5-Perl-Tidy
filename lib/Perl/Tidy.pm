@@ -7680,7 +7680,7 @@ EOM
 
     # implement outdenting preferences for keywords
     %outdent_keyword = ();
-    unless ( @_ = split_words( $rOpts->{'outdent-keyword-list'} ) ) {
+    unless ( @_ = split_words( $rOpts->{'outdent-keyword-okl'} ) ) {
         @_ = qw(next last redo goto return);    # defaults
     }
 
@@ -9531,10 +9531,20 @@ sub set_white_space_flag {
         # qw lines will still go out at the end of this routine.
         if ( $rOpts->{'indent-only'} ) {
             flush();
-            trim($input_line);
+            my $line = $input_line;
+
+            # delete side comments if requested with -io, but
+            # we will not allow deleting of closing side comments with -io
+            # because the coding would be more complex
+            if (   $rOpts->{'delete-side-comments'}
+                && $rtoken_type->[$jmax] eq '#' )
+            {
+                $line = join "", @{$rtokens}[ 0 .. $jmax - 1 ];
+            }
+            trim($line);
 
             extract_token(0);
-            $token                 = $input_line;
+            $token                 = $line;
             $type                  = 'q';
             $block_type            = "";
             $container_type        = "";
@@ -9599,6 +9609,8 @@ sub set_white_space_flag {
                 && $types_to_go[$max_index_to_go] eq ',' )
           )
         {
+            $forced_breakpoint_to_go[$max_index_to_go] = 1
+              if ($rOpts_break_at_old_comma_breakpoints);
             destroy_one_line_block();
             output_line_to_go();
         }
@@ -10628,16 +10640,17 @@ sub starting_one_line_block {
             $i_start++;
         }
 
-        unless ( $tokens_to_go[$i_start] eq $block_type ) {
+        # Patch to avoid breaking short blocks defined with extended_syntax:
+        # Strip off any trailing () which was added in the parser to mark
+        # the opening keyword.  For example, in the following
+        #    create( TypeFoo $e) {$bubba}
+        # the blocktype would be marked as create()
+        my $stripped_block_type = $block_type;
+        $stripped_block_type =~ s/\(\)$//;
+
+        unless ( $tokens_to_go[$i_start] eq $stripped_block_type ) {
             return 0;
         }
-    }
-
-    # the previous nonblank token should start these block types
-    elsif (( $last_last_nonblank_token_to_go eq $block_type )
-        || ( $block_type =~ /^sub/ ) )
-    {
-        $i_start = $last_last_nonblank_index_to_go;
     }
 
     # patch for SWITCH/CASE to retain one-line case/when blocks
@@ -13076,7 +13089,7 @@ sub lookup_opening_indentation {
                 # but right now we do not have that information.  For now
                 # we see if we are in a list, and this works well.
                 # See test files 'sub*.t' for good test cases.
-                elsif ($block_type_to_go[$ibeg] eq 'sub'
+                if (   $block_type_to_go[$ibeg] =~ /^sub\s*\(?/
                     && $container_environment_to_go[$i_terminal] eq 'LIST'
                     && !$rOpts->{'indent-closing-brace'} )
                 {
@@ -13088,7 +13101,8 @@ sub lookup_opening_indentation {
                         $rindentation_list );
                     my $indentation = $leading_spaces_to_go[$ibeg];
                     if ( defined($opening_indentation)
-                        && $indentation > $opening_indentation )
+                        && get_SPACES($indentation) >
+                        get_SPACES($opening_indentation) )
                     {
                         $adjust_indentation = 1;
                     }
@@ -13111,7 +13125,8 @@ sub lookup_opening_indentation {
                     $rindentation_list );
                 my $indentation = $leading_spaces_to_go[$ibeg];
                 if ( defined($opening_indentation)
-                    && $indentation > $opening_indentation )
+                    && get_SPACES($indentation) >
+                    get_SPACES($opening_indentation) )
                 {
                     $adjust_indentation = 1;
                 }
@@ -24204,9 +24219,9 @@ sub prepare_for_a_new_file {
     # in the form:
     # keyword ( .... ) { BLOCK }
     # patch for SWITCH/CASE: added 'switch' 'case' 'given' 'when'
-    #   TryCatch catch($e) : added 'catch'
     my %is_blocktype_with_paren;
-    @_ = qw(if elsif unless while until for foreach switch case given when catch);
+    @_ =
+      qw(if elsif unless while until for foreach switch case given when catch);
     @is_blocktype_with_paren{@_} = (1) x scalar(@_);
 
     # ------------------------------------------------------------
@@ -26636,7 +26651,7 @@ EOM
                         # otherwise, the token after a ',' starts a new term
 
                         # Patch FOR RT#99961; no continuation after a ';'
-			# This is needed because perltidy currently marks
+                        # This is needed because perltidy currently marks
                         # a block preceded by a type character like % or @
                         # as a non block, to simplify formatting. But these
                         # are actually blocks and can have semicolons.
@@ -29944,12 +29959,12 @@ BEGIN {
     @is_indirect_object_taker{@_} = (1) x scalar(@_);
 
     # These tokens may precede a code block
-    # patched for SWITCH/CASE
+    # patched for SWITCH/CASE/CATCH.  Actually these could be removed
+    # now and we could let the extended-syntax coding handle them
     @_ =
       qw( BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue if elsif else
       unless do while until eval for foreach map grep sort
-      switch case given when
-      try catch finally);
+      switch case given when catch try finally);
     @is_code_block_token{@_} = (1) x scalar(@_);
 
     # I'll build the list of keywords incrementally
