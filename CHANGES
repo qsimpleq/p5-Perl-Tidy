@@ -1,4 +1,55 @@
 Perltidy Change Log
+  2016 03 02
+      - RT #112534. Corrected a minor problem in which an unwanted newline
+        was placed before the closing brace of an anonymous sub with 
+        a signature, if it was in a list.  Thanks to Dmytro Zagashev.
+
+      - Corrected a minor problem in which occasional extra indentation was
+        given to the closing brace of an anonymous sub in a list when the -lp 
+        parameter was set.
+
+  2016 03 01
+      - RT #104427. Added support for signatures.
+
+      - RT #111512.  Changed global warning flag $^W = 1 to use warnings;
+        Thanks to Dmytro Zagashev.
+
+      - RT #110297, added support for new regexp modifier /n
+        Thanks to Dmytro Zagashev.
+
+      - RT #111519.  The -io (--indent-only) and -dac (--delete-all-comments)
+        can now both be used in one pass. Thanks to Dmitry Veltishev.
+
+      - Patch to avoid error message with 'catch' used by TryCatch, as in
+           catch($err){
+              # do something
+           }
+        Thanks to Nick Tonkin.
+
+      - RT #32905, UTF-8 coding is now more robust. Thanks to qsimpleq
+        and Dmytro for patches.
+
+      - RT #106885. Added string bitwise operators ^. &. |. ~. ^.= &.= |.=
+ 
+      - Fixed RT #107832 and #106492, lack of vertical alignment of two lines
+        when -boc flag (break at old commas) is set.  This bug was 
+        inadvertantly introduced in previous bug fix RT #98902. 
+
+      - Some common extensions to Perl syntax are handled better.
+        In particular, the following snippet is now foratted cleanly:
+
+          method deposit( Num $amount) {
+              $self->balance( $self->balance + $amount );
+          }
+
+        A new flag -xs (--extended-syntax) was added to enable this, and the default
+        is to use -xs. 
+
+        In previous versions, and now only when -nxs is set, this snippet of code
+        generates the following error message:
+
+        "syntax error at ') {', didn't see one of: case elsif for foreach given if switch unless until when while"
+
   2015 08 15
       - Fixed RT# 105484, Invalid warning about 'else' in 'switch' statement.  The
         warning happened if a 'case' statement did not use parens.
