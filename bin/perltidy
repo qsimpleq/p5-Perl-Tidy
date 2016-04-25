@@ -501,6 +501,24 @@ Perltidy will pass your string to perl with the exception that it will
 add a B<-c> and B<-x> if appropriate.  The F<.LOG> file will show
 exactly what flags were passed to perl.
 
+=item B<-xs>,   B<--extended-syntax>      
+
+A problem with formatting Perl code is that some modules can introduce new
+syntax.  This flag allows perltidy to handle certain common extensions
+to the standard syntax without complaint.  
+
+For example, without this flag a structure such as the following would generate
+a syntax error and the braces would not be balanced:
+
+    method deposit( Num $amount) {
+        $self->balance( $self->balance + $amount );
+    }
+
+This flag is enabled by default but it can be deactivated with B<-nxs>.
+Probably the only reason to deactivate this flag is to generate more diagnostic
+messages when debugging a script.
+
+
 =item B<-io>,   B<--indent-only>       
 
 This flag is used to deactivate all whitespace and line break changes
@@ -524,6 +542,11 @@ With this option perltidy is still free to modify the indenting (and
 outdenting) of code and comments as it normally would.  If you also want to
 prevent long comment lines from being outdented, you can add either B<-noll> or
 B<-l=0>.
+
+Setting this flag will prevent perltidy from doing any special operations on
+closing side comments.  You may still delete all side comments however when
+this flag is in effect.
+
 
 =item B<-enc=s>,  B<--character-encoding=s>
 
@@ -3116,7 +3139,7 @@ perlstyle(1), Perl::Tidy(3)
 
 =head1 VERSION
 
-This man page documents perltidy version 20150815.
+This man page documents perltidy version 20160302.
 
 =head1 CREDITS
 

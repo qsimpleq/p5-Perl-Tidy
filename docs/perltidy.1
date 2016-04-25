@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "PERLTIDY 1"
-.TH PERLTIDY 1 "2015-08-14" "perl v5.14.2" "User Contributed Perl Documentation"
+.TH PERLTIDY 1 "2016-03-01" "perl v5.14.2" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -615,6 +615,24 @@ if the taint flag, \f(CW\*(C`\-T\*(C'\fR, is not wanted, the flag could be set t
 Perltidy will pass your string to perl with the exception that it will
 add a \fB\-c\fR and \fB\-x\fR if appropriate.  The \fI.LOG\fR file will show
 exactly what flags were passed to perl.
+.IP "\fB\-xs\fR,   \fB\-\-extended\-syntax\fR" 4
+.IX Item "-xs,   --extended-syntax"
+A problem with formatting Perl code is that some modules can introduce new
+syntax.  This flag allows perltidy to handle certain common extensions
+to the standard syntax without complaint.
+.Sp
+For example, without this flag a structure such as the following would generate
+a syntax error and the braces would not be balanced:
+.Sp
+.Vb 3
+\&    method deposit( Num $amount) {
+\&        $self\->balance( $self\->balance + $amount );
+\&    }
+.Ve
+.Sp
+This flag is enabled by default but it can be deactivated with \fB\-nxs\fR.
+Probably the only reason to deactivate this flag is to generate more diagnostic
+messages when debugging a script.
 .IP "\fB\-io\fR,   \fB\-\-indent\-only\fR" 4
 .IX Item "-io,   --indent-only"
 This flag is used to deactivate all whitespace and line break changes
@@ -638,6 +656,10 @@ With this option perltidy is still free to modify the indenting (and
 outdenting) of code and comments as it normally would.  If you also want to
 prevent long comment lines from being outdented, you can add either \fB\-noll\fR or
 \&\fB\-l=0\fR.
+.Sp
+Setting this flag will prevent perltidy from doing any special operations on
+closing side comments.  You may still delete all side comments however when
+this flag is in effect.
 .IP "\fB\-enc=s\fR,  \fB\-\-character\-encoding=s\fR" 4
 .IX Item "-enc=s,  --character-encoding=s"
 where \fBs\fR=\fBnone\fR or \fButf8\fR.  This flag tells perltidy the character encoding
@@ -3207,7 +3229,7 @@ purpose of this rule is to prevent generating confusing filenames such as
 \&\fIperlstyle\fR\|(1), \fIPerl::Tidy\fR\|(3)
 .SH "VERSION"
 .IX Header "VERSION"
-This man page documents perltidy version 20150815.
+This man page documents perltidy version 20160302.
 .SH "CREDITS"
 .IX Header "CREDITS"
 Michael Cartmell supplied code for adaptation to \s-1VMS\s0 and helped with
