@@ -3959,15 +3959,13 @@ sub new {
         unless ($fh) { Perl::Tidy::Die "Cannot write to output stream\n"; }
         $output_file_open = 1;
         if ($binmode) {
-            if ( ref($fh) eq 'IO::File' ) {
-                if (   $rOpts->{'character-encoding'}
-                    && $rOpts->{'character-encoding'} eq 'utf8' )
+            if ( $rOpts->{'character-encoding'}
+                 && $rOpts->{'character-encoding'} eq 'utf8' )
                 {
-                    binmode $fh, ":encoding(UTF-8)";
+                    if ( ref($fh) eq 'IO::File' ) { $fh->binmode(":encoding(UTF-8)") }
+                    elsif ( $output_file eq '-' ) { binmode STDOUT, ":encoding(UTF-8)"}
                 }
-                else { binmode $fh }
-            }
-            if ( $output_file eq '-' ) { binmode STDOUT }
+            elsif ( $output_file eq '-' ) { binmode STDOUT }
         }
     }
 
