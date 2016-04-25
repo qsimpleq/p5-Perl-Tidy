@@ -3962,8 +3962,8 @@ sub new {
             if ( $rOpts->{'character-encoding'}
                  && $rOpts->{'character-encoding'} eq 'utf8' )
                 {
-                    if ( ref($fh) eq 'IO::File' ) { $fh->binmode(":encoding(UTF-8)") }
-                    elsif ( $output_file eq '-' ) { binmode STDOUT, ":encoding(UTF-8)"}
+                    if ( ref($fh) eq 'IO::File' ) { $fh->binmode(":encoding(UTF-8)"); }
+                    elsif ( $output_file eq '-' ) { binmode STDOUT, ":encoding(UTF-8)"; }
                 }
             elsif ( $output_file eq '-' ) { binmode STDOUT }
         }
