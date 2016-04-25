@@ -13407,18 +13407,8 @@ sub lookup_opening_indentation {
         {
             my $space_count = leading_spaces_to_go($ibeg);
             if ( $space_count > 0 ) {
-                if (
-                       $rOpts->{'outdent-keywords'}
-                    && $types_to_go[$ibeg] eq 'k'
-                    && $outdent_keyword{ $tokens_to_go[$ibeg] }
-                    && $rOpts->{'outdent-keyword-size'}
-                    )
-                {
-                    $space_count -= $rOpts->{'outdent-keyword-size'};
-                }
-                else { $space_count -= $rOpts_continuation_indentation; }
+                $space_count -= $rOpts_continuation_indentation;
                 $is_outdented_line = 1;
-
                 if ( $space_count < 0 ) { $space_count = 0 }
 
                 # do not promote a spaced static block comment to non-spaced;
@@ -17259,6 +17249,26 @@ sub undo_forced_breakpoint_stack {
 
         @_ = qw( * / );
         @is_mult_div{@_} = (1) x scalar(@_);
+    }
+
+    sub DUMP_BREAKPOINTS {
+
+        # Debug routine to dump current breakpoints...not normally called
+        # We are given indexes to the current lines:
+        # $ri_beg = ref to array of BEGinning indexes of each line
+        # $ri_end = ref to array of ENDing indexes of each line
+        my ( $ri_beg, $ri_end, $msg ) = @_;
+        print STDERR "----Dumping breakpoints from: $msg----\n";
+        for my $n ( 0 .. @{$ri_end} - 1 ) {
+            my $ibeg = $$ri_beg[$n];
+            my $iend = $$ri_end[$n];
+            my $text = "";
+            foreach my $i ( $ibeg .. $iend ) {
+                $text .= $tokens_to_go[$i];
+            }
+            print STDERR "$n ($ibeg:$iend) $text\n";
+        }
+        print STDERR "----\n";
     }
 
     sub recombine_breakpoints {
@@ -24565,9 +24575,21 @@ sub prepare_for_a_new_file {
 
                 # check for syntax error here;
                 unless ( $is_blocktype_with_paren{$last_nonblank_token} ) {
-                    my $list = join( ' ', sort keys %is_blocktype_with_paren );
-                    warning(
-                        "syntax error at ') {', didn't see one of: $list\n");
+                    if ( $tokenizer_self->{'_extended_syntax'} ) {
+
+                        # we append a trailing () to mark this as an unknown
+                        # block type.  This allows perltidy to format some
+                        # common extensions of perl syntax.
+                        # This is used by sub code_block_type
+                        $last_nonblank_token .= '()';
+                    }
+                    else {
+                        my $list =
+                          join( ' ', sort keys %is_blocktype_with_paren );
+                        warning(
+"syntax error at ') {', didn't see one of: <<$list>>; If this code is okay try using the -xs flag\n"
+                        );
+                    }
                 }
             }
 
@@ -25090,21 +25112,22 @@ sub prepare_for_a_new_file {
         '__DATA__' => '_in_data',
     );
 
-    # ref: camel 3 p 147,
+    # original ref: camel 3 p 147,
     # but perl may accept undocumented flags
     # perl 5.10 adds 'p' (preserve)
-    # Perl version 5.16, http://perldoc.perl.org/perlop.html,  has these:
-    # /PATTERN/msixpodualgc or m?PATTERN?msixpodualgc
-    # s/PATTERN/REPLACEMENT/msixpodualgcer
+    # Perl version 5.22 added 'n'
+    # From http://perldoc.perl.org/perlop.html we have
+    # /PATTERN/msixpodualngc or m?PATTERN?msixpodualngc
+    # s/PATTERN/REPLACEMENT/msixpodualngcer
     # y/SEARCHLIST/REPLACEMENTLIST/cdsr
     # tr/SEARCHLIST/REPLACEMENTLIST/cdsr
-    # qr/STRING/msixpodual
+    # qr/STRING/msixpodualn
     my %quote_modifiers = (
-        's'  => '[msixpodualgcer]',
+        's'  => '[msixpodualngcer]',
         'y'  => '[cdsr]',
         'tr' => '[cdsr]',
-        'm'  => '[msixpodualgc]',
-        'qr' => '[msixpodual]',
+        'm'  => '[msixpodualngc]',
+        'qr' => '[msixpodualn]',
         'q'  => "",
         'qq' => "",
         'qw' => "",
@@ -27152,6 +27175,12 @@ sub code_block_type {
         }
     }
 
+    # handle unknown syntax ') {'
+    # we previously appended a '()' to mark this case
+    elsif ( $last_nonblank_token =~ /\(\)$/ ) {
+        return $last_nonblank_token;
+    }
+
     # anything else must be anonymous hash reference
     else {
         return "";
@@ -28264,7 +28293,7 @@ sub scan_identifier_do {
     # $last_nonblank_type
 
     my ( $i, $id_scan_state, $identifier, $rtokens, $max_token_index,
-        $expecting )
+        $expecting, $container_type )
       = @_;
     my $i_begin   = $i;
     my $type      = '';
@@ -28274,6 +28303,8 @@ sub scan_identifier_do {
     my $identifier_begin    = $identifier;
     my $tok                 = $tok_begin;
     my $message             = "";
+
+    my $in_prototype_or_signature = $container_type =~ /^sub/;
 
     # these flags will be used to help figure out the type:
     my $saw_alpha = ( $tok =~ /^[A-Za-z_]/ );
@@ -28481,6 +28512,13 @@ sub scan_identifier_do {
                 }
             }
             else {    # something else
+
+                if ( $in_prototype_or_signature && $tok =~ /^[\),=]/ ) {
+                    $id_scan_state = '';
+                    $i             = $i_save;
+                    $type          = 'i';       # probably punctuation variable
+                    last;
+                }
 
                 # check for various punctuation variables
                 if ( $identifier =~ /^[\$\*\@\%]$/ ) {
@@ -28797,20 +28835,16 @@ sub scan_identifier_do {
         my $pos_beg = $$rtoken_map[$i_beg];
         pos($input_line) = $pos_beg;
 
-        # sub NAME PROTO ATTRS
+        # Look for the sub NAME
         if (
             $input_line =~ m/\G\s*
         ((?:\w*(?:'|::))*)  # package - something that ends in :: or '
         (\w+)               # NAME    - required
-        (\s*\([^){]*\))?    # PROTO   - something in parens
-        (\s*:)?             # ATTRS   - leading : of attribute list
         /gcx
           )
         {
             $match   = 1;
             $subname = $2;
-            $proto   = $3;
-            $attrs   = $4;
 
             $package = ( defined($1) && $1 ) ? $1 : $current_package;
             $package =~ s/\'/::/g;
@@ -28822,19 +28856,34 @@ sub scan_identifier_do {
             $type = 'i';
         }
 
-        # Look for prototype/attributes not preceded on this line by subname;
-        # This might be an anonymous sub with attributes,
+        # Now look for PROTO ATTRS
+        # Look for prototype/attributes which are usually on the same
+        # line as the sub name but which might be on a separate line.
+        # For example, we might have an anonymous sub with attributes,
         # or a prototype on a separate line from its sub name
-        elsif (
-            $input_line =~ m/\G(\s*\([^){]*\))?  # PROTO
+
+        # NOTE: We only want to parse PROTOTYPES here. If we see anything that
+        # does not look like a prototype, we assume it is a SIGNATURE and we
+        # will stop and let the the standard tokenizer handle it.  In
+        # particular, we stop if we see any nested parens, braces, or commas.
+        my $saw_opening_paren = $input_line =~ /\G\s*\(/;
+        if (
+            $input_line =~ m/\G(\s*\([^\)\(\}\{\,]*\))?  # PROTO
             (\s*:)?                              # ATTRS leading ':'
             /gcx
             && ( $1 || $2 )
           )
         {
-            $match = 1;
             $proto = $1;
             $attrs = $2;
+
+            # If we also found the sub name on this call then append PROTO.
+            # This is not necessary but for compatability with previous
+            # versions when the -csc flag is used:
+            if ( $match && $proto ) {
+                $tok .= $proto;
+            }
+            $match ||= 1;
 
             # Handle prototype on separate line from subname
             if ($subname_saved) {
@@ -28924,19 +28973,21 @@ sub scan_identifier_do {
                 $statement_type = $tok;
             }
 
-            # see if PROTO follows on another line:
+            # if we stopped before an open paren ...
             elsif ( $next_nonblank_token eq '(' ) {
-                if ( $attrs || $proto ) {
-                    warning(
-"unexpected '(' after definition or declaration of sub '$subname'\n"
-                    );
+
+                # If we DID NOT see this paren above then it must be on the
+                # next line so we will set a flag to come back here and see if
+                # it is a PROTOTYPE
+
+                # Otherwise, we assume it is a SIGNATURE rather than a
+                # PROTOTYPE and let the normal tokenizer handle it as a list
+                if ( !$saw_opening_paren ) {
+                    $id_scan_state = 'sub';     # we must come back to get proto
+                    $package_saved = $package;
+                    $subname_saved = $subname;
                 }
-                else {
-                    $id_scan_state  = 'sub';    # we must come back to get proto
-                    $statement_type = $tok;
-                    $package_saved  = $package;
-                    $subname_saved  = $subname;
-                }
+                $statement_type = $tok;
             }
             elsif ($next_nonblank_token) {      # EOF technically ok
                 warning(
