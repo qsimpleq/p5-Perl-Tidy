@@ -10146,6 +10146,9 @@ sub set_white_space_flag {
                         # don't delete ; before a # because it would promote it
                         # to a block comment
                         && ( $next_nonblank_token_type ne '#' )
+                        && ( $last_nonblank_block_type ne 'try' )
+                        && ( $last_nonblank_block_type ne 'catch' )
+                        && ( $last_nonblank_block_type ne 'finally' )
                       )
                     {
                         note_deleted_semicolon();
