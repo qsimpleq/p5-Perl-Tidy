@@ -6318,8 +6318,7 @@ BEGIN {
     # We can remove semicolons after blocks preceded by these keywords
     @_ =
       qw(BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue if elsif else
-      unless while until for foreach given when default
-      try catch finally);
+      unless while until for foreach given when default);
     @is_block_without_semicolon{@_} = (1) x scalar(@_);
 
     # We will allow semicolons to be added within these block types
@@ -7828,7 +7827,7 @@ EOM
     push @_, ',';
 
     # allow cuddled continue if cuddled else is specified
-    if ( $rOpts->{'cuddled-else'} ) { push @_, qw'continue catch finally'; }
+    if ( $rOpts->{'cuddled-else'} ) { push @_, 'continue'; }
 
     @is_other_brace_follower{@_} = (1) x scalar(@_);
 
@@ -10146,9 +10145,6 @@ sub set_white_space_flag {
                         # don't delete ; before a # because it would promote it
                         # to a block comment
                         && ( $next_nonblank_token_type ne '#' )
-                        && ( $last_nonblank_block_type ne 'try' )
-                        && ( $last_nonblank_block_type ne 'catch' )
-                        && ( $last_nonblank_block_type ne 'finally' )
                       )
                     {
                         note_deleted_semicolon();
@@ -25064,8 +25060,7 @@ sub prepare_for_a_new_file {
     # patched for SWITCH/CASE/
     my %is_zero_continuation_block_type;
     @_ = qw( } { BEGIN END CHECK INIT AUTOLOAD DESTROY UNITCHECK continue ;
-      if elsif else unless while until for foreach switch case given when
-      try catch finally);
+      if elsif else unless while until for foreach switch case given when);
     @is_zero_continuation_block_type{@_} = (1) x scalar(@_);
 
     my %is_not_zero_continuation_block_type;
@@ -30246,9 +30241,7 @@ BEGIN {
       err
       say
 
-      try
       catch
-      finally
     );
 
     # patched above for SWITCH/CASE given/when err say
@@ -30443,10 +30436,6 @@ BEGIN {
       while
       given
       when
-
-      try
-      catch
-      finally
     );
     @is_keyword_taking_list{@keyword_taking_list} =
       (1) x scalar(@keyword_taking_list);
