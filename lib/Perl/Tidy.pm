@@ -7827,7 +7827,7 @@ EOM
     push @_, ',';
 
     # allow cuddled continue if cuddled else is specified
-    if ( $rOpts->{'cuddled-else'} ) { push @_, qw'continue catch finally'; }
+    if ( $rOpts->{'cuddled-else'} ) { push @_, 'continue'; }
 
     @is_other_brace_follower{@_} = (1) x scalar(@_);
 
